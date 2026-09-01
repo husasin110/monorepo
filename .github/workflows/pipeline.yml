@@ -17,9 +17,6 @@ jobs:
   terraform:
     name: 'Terraform and App Deploy'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: infra
 
     steps:
     - name: Checkout Repository
@@ -29,6 +26,7 @@ jobs:
       uses: hashicorp/setup-terraform@v3
 
     - name: Terraform Init
+      working-directory: infra
       run: terraform init
       env:
         ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -38,6 +36,7 @@ jobs:
 
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      working-directory: infra
       run: terraform apply -auto-approve
       env:
         ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -56,11 +55,11 @@ jobs:
       uses: azure/webapps-deploy@v3
       with:
         app-name: 'app-hussain-api-7721'
-        package: 'api'
+        package: './api'
 
     - name: Deploy UI Code
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
       uses: azure/webapps-deploy@v3
       with:
         app-name: 'app-hussain-ui-7721'
-        package: 'ui'
+        package: './ui'
