@@ -9,7 +9,7 @@ resource "azurerm_service_plan" "main" {
 }
 
 resource "azurerm_linux_web_app" "api" {
-  name                = "app-hussain-api-7721"
+  name                = "app-hussain-api-unique-992"
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
   service_plan_id     = azurerm_service_plan.main.id
@@ -27,7 +27,7 @@ resource "azurerm_linux_web_app" "api" {
 }
 
 resource "azurerm_linux_web_app" "ui" {
-  name                = "app-hussain-ui-7721"
+  name                = "app-hussain-ui-unique-992"
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
   service_plan_id     = azurerm_service_plan.main.id
