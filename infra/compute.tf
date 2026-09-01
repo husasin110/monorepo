@@ -31,6 +31,11 @@ resource "azurerm_linux_web_app" "api" {
   }
 }
 
+import {
+  to = azurerm_linux_web_app.api
+  id = "/subscriptions/cf623437-cc05-43bb-b63b-dfd5991c17b4/resourceGroups/rg-hussain-enterprise/providers/Microsoft.Web/sites/app-hussain-api-unique-992"
+}
+
 resource "azurerm_linux_web_app" "ui" {
   name                = "app-hussain-ui-unique-992"
   location            = var.location
@@ -46,4 +51,9 @@ resource "azurerm_linux_web_app" "ui" {
   }
 
   depends_on = [azurerm_linux_web_app.api]
+}
+
+import {
+  to = azurerm_linux_web_app.ui
+  id = "/subscriptions/cf623437-cc05-43bb-b63b-dfd5991c17b4/resourceGroups/rg-hussain-enterprise/providers/Microsoft.Web/sites/app-hussain-ui-unique-992"
 }
