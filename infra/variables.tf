@@ -5,5 +5,5 @@ variable "location" {
 
 variable "resource_group_name" {
   type    = string
-  default = "rg-hussain-fresh-v2"
+  default = "rg-hussain-enterprise"
 }
