@@ -8,6 +8,11 @@ resource "azurerm_service_plan" "main" {
   depends_on = [azurerm_resource_group.main]
 }
 
+import {
+  to = azurerm_service_plan.main
+  id = "/subscriptions/cf623437-cc05-43bb-b63b-dfd5991c17b4/resourceGroups/rg-hussain-enterprise/providers/Microsoft.Web/serverFarms/asp-hussain-fresh"
+}
+
 resource "azurerm_linux_web_app" "api" {
   name                = "app-hussain-api-unique-992"
   location            = var.location
