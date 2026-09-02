@@ -255,6 +255,10 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          git tag -a "$TAG_NAME" -m "Automated deployment tag for version $VERSION"
-          git push origin "$TAG_NAME"
-          echo "Successfully created and pushed tag: $TAG_NAME"
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+            echo "Tag $TAG_NAME already exists. Skipping tag creation."
+          else
+            git tag -a "$TAG_NAME" -m "Automated deployment tag for version $VERSION"
+            git push origin "$TAG_NAME"
+            echo "Successfully created and pushed tag: $TAG_NAME"
+          fi
