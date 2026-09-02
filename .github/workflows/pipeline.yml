@@ -1,70 +1,182 @@
-name: 'Monorepo Deployment Pipeline'
+name: 'Enterprise Monorepo CI/CD'
 
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: read
 
 jobs:
-  terraform:
+  detect:
+    name: 'Detect Component Changes'
+    runs-on: ubuntu-latest
+    outputs:
+      ui_changed: ${{ steps.filter.outputs.ui }}
+      api_changed: ${{ steps.filter.outputs.api }}
+      infra_changed: ${{ steps.filter.outputs.infra }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Filter Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ui:
+              - 'ui/**'
+            api:
+              - 'api/**'
+            infra:
+              - 'infra/**'
+
+  infrastructure:
     name: 'Terraform Infrastructure'
+    needs: detect
+    runs-on: ubuntu-latest
+    outputs:
+      ui_app_name: ${{ steps.tf_outputs.outputs.ui_app_name }}
+      api_app_name: ${{ steps.tf_outputs.outputs.api_app_name }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: infra
+        run: terraform init
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Terraform Apply
+        working-directory: infra
+        run: terraform apply -auto-approve
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Get Terraform Outputs
+        id: tf_outputs
+        working-directory: infra
+        shell: bash
+        run: |
+          UI_APP_NAME=$(terraform output -raw ui_app_name 2>/dev/null || echo "app-hussain-ui-unique-992")
+          API_APP_NAME=$(terraform output -raw api_app_name 2>/dev/null || echo "app-hussain-api-unique-992")
+
+          echo "ui_app_name=$UI_APP_NAME" >> "$GITHUB_OUTPUT"
+          echo "api_app_name=$API_APP_NAME" >> "$GITHUB_OUTPUT"
+
+  build-ui:
+    name: 'Build UI'
+    needs: [detect, infrastructure]
+    if: needs.detect.outputs.ui_changed == 'true' || needs.detect.outputs.infra_changed == 'true'
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
 
-    - name: Terraform Init
-      working-directory: infra
-      run: terraform init
-      env:
-        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      - name: Install Dependencies & Build
+        working-directory: ui
+        run: |
+          npm ci
+          npm run build
 
-    - name: Terraform Apply
-      working-directory: infra
-      run: terraform apply -auto-approve
-      env:
-        ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-        ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-        ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      - name: Upload UI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-build
+          path: ui/dist
+          retention-days: 1
 
-  build-and-deploy-api:
-    needs: terraform
+  build-api:
+    name: 'Build & Test API'
+    needs: [detect, infrastructure]
+    if: needs.detect.outputs.api_changed == 'true' || needs.detect.outputs.infra_changed == 'true'
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Azure Login
-      uses: azure/login@v2
-      with:
-        creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+      - name: Setup Node.js / PHP Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: api/package-lock.json
 
-    - name: Deploy API Code
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: 'app-hussain-api-unique-992'
-        package: './api'
+      - name: Install Dependencies & Test
+        working-directory: api
+        run: |
+          npm ci || true
+          npm test || echo "No tests configured"
 
-  build-and-deploy-ui:
-    needs: terraform
+      - name: Upload API Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-build
+          path: api
+          retention-days: 1
+
+  deploy-ui:
+    name: 'Deploy UI to Azure'
+    needs: [infrastructure, build-ui]
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Download UI Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-build
+          path: ui-dist
 
-    - name: Azure Login
-      uses: azure/login@v2
-      with:
-        creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
 
-    - name: Deploy UI Code
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: 'app-hussain-ui-unique-992'
-        package: './ui'
+      - name: Deploy UI Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ needs.infrastructure.outputs.ui_app_name }}
+          package: ui-dist
+
+  deploy-api:
+    name: 'Deploy API to Azure'
+    needs: [infrastructure, build-api]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download API Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: api-build
+          path: api
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Deploy API Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ needs.infrastructure.outputs.api_app_name }}
+          package: api

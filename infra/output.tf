@@ -1,0 +1,7 @@
+output "ui_app_name" {
+  value = azurerm_linux_web_app.ui.name
+}
+
+output "api_app_name" {
+  value = azurerm_linux_web_app.api.name
+}
