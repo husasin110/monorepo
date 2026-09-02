@@ -36,9 +36,44 @@ jobs:
             infra:
               - 'infra/**'
 
+  versioning:
+    name: 'Manage Version via Azure Key Vault'
+    needs: detect
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.bump.outputs.new_version }}
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
+
+      - name: Read, Bump, and Write Version
+        id: bump
+        shell: bash
+        run: |
+          VAULT_NAME="${{ secrets.AZURE_KEYVAULT_NAME }}"
+          SECRET_NAME="app-version"
+
+          # Fetch current version from Azure Key Vault (default to 1.0.0 if not found)
+          CURRENT_VERSION=$(az keyvault secret show --vault-name "$VAULT_NAME" --name "$SECRET_NAME" --query "value" -o tsv 2>/dev/null || echo "1.0.0")
+
+          # Simple patch version bump (e.g., 1.0.4 -> 1.0.5)
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+          patch=$((patch + 1))
+          NEW_VERSION="$major.$minor.$patch"
+
+          echo "Current Version: $CURRENT_VERSION"
+          echo "Bumped Version: $NEW_VERSION"
+
+          # Write updated version back to Azure Key Vault
+          az keyvault secret set --vault-name "$VAULT_NAME" --name "$SECRET_NAME" --value "$NEW_VERSION" > /dev/null
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
   infrastructure:
     name: 'Terraform Infrastructure'
-    needs: detect
+    needs: [detect, versioning]
     runs-on: ubuntu-latest
     outputs:
       ui_app_name: ${{ steps.tf_outputs.outputs.ui_app_name }}
@@ -69,6 +104,7 @@ jobs:
           ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          TF_VAR_app_version: ${{ needs.versioning.outputs.app_version }}
 
       - name: Get Terraform Outputs
         id: tf_outputs
@@ -88,10 +124,11 @@ jobs:
 
           echo "UI App Service: '$UI_APP_NAME'"
           echo "API App Service: '$API_APP_NAME'"
+          echo "Deployed Version: ${{ needs.versioning.outputs.app_version }}"
 
   build-ui:
     name: 'Prepare UI Artifact'
-    needs: [detect, infrastructure]
+    needs: [detect, infrastructure, versioning]
     if: needs.detect.outputs.ui_changed == 'true' || needs.detect.outputs.infra_changed == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -107,7 +144,7 @@ jobs:
 
   build-api:
     name: 'Build & Test API'
-    needs: [detect, infrastructure]
+    needs: [detect, infrastructure, versioning]
     if: needs.detect.outputs.api_changed == 'true' || needs.detect.outputs.infra_changed == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -134,7 +171,7 @@ jobs:
 
   deploy-ui:
     name: 'Deploy UI to Azure'
-    needs: [infrastructure, build-ui]
+    needs: [infrastructure, build-ui, versioning]
     runs-on: ubuntu-latest
     steps:
       - name: Download UI Artifact
@@ -157,7 +194,7 @@ jobs:
 
   deploy-api:
     name: 'Deploy API to Azure'
-    needs: [infrastructure, build-api]
+    needs: [infrastructure, build-api, versioning]
     runs-on: ubuntu-latest
     steps:
       - name: Download API Artifact
