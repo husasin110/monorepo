@@ -75,8 +75,8 @@ jobs:
         working-directory: infra
         shell: bash
         run: |
-          UI_APP_NAME=$(terraform output -raw ui_app_name 2>/dev/null || echo "app-hussain-ui-unique-992")
-          API_APP_NAME=$(terraform output -raw api_app_name 2>/dev/null || echo "app-hussain-api-unique-992")
+          UI_APP_NAME=$(terraform output -raw ui_app_name 2>/dev/null | xargs || echo "app-hussain-ui-unique-992")
+          API_APP_NAME=$(terraform output -raw api_app_name 2>/dev/null | xargs || echo "app-hussain-api-unique-992")
 
           echo "ui_app_name<<EOF" >> $GITHUB_OUTPUT
           echo "$UI_APP_NAME" >> $GITHUB_OUTPUT
@@ -86,8 +86,8 @@ jobs:
           echo "$API_APP_NAME" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-          echo "UI App Service: $UI_APP_NAME"
-          echo "API App Service: $API_APP_NAME"
+          echo "UI App Service: '$UI_APP_NAME'"
+          echo "API App Service: '$API_APP_NAME'"
 
   build-ui:
     name: 'Prepare UI Artifact'
