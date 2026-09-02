@@ -217,7 +217,7 @@ jobs:
 
   create-tag:
     name: 'Create Deployment Git Tag'
-    needs: [infrastructure, deploy-ui, deploy-api]
+    needs: [versioning, infrastructure, deploy-ui, deploy-api]
     if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
     runs-on: ubuntu-latest
     steps:
