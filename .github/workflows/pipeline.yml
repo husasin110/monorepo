@@ -100,8 +100,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-          cache-dependency-path: 'ui/package-lock.json'
 
       - name: Install Dependencies & Build
         working-directory: ui
@@ -129,8 +127,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: api/package-lock.json
 
       - name: Install Dependencies & Test
         working-directory: api
