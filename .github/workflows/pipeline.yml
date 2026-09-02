@@ -7,7 +7,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
   pull-requests: read
 
 jobs:
@@ -214,3 +214,26 @@ jobs:
           app-name: app-hussain-api-unique-992
           resource-group-name: rg-hussain-enterprise
           package: api
+
+  create-tag:
+    name: 'Create Deployment Git Tag'
+    needs: [infrastructure, deploy-ui, deploy-api]
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and Push Tag
+        env:
+          VERSION: ${{ needs.versioning.outputs.app_version }}
+        run: |
+          TAG_NAME="dev-$VERSION"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a "$TAG_NAME" -m "Automated deployment tag for version $VERSION"
+          git push origin "$TAG_NAME"
+          echo "Successfully created and pushed tag: $TAG_NAME"
