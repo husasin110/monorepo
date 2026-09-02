@@ -22,7 +22,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Filter Changed Paths
         uses: dorny/paths-filter@v3
@@ -47,7 +47,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-           fetch-depth: 0
+          fetch-depth: 0
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
