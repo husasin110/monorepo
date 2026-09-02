@@ -152,6 +152,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ needs.infrastructure.outputs.ui_app_name }}
+          resource-group: rg-hussain-enterprise
           package: ui-dist
 
   deploy-api:
@@ -174,4 +175,5 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ needs.infrastructure.outputs.api_app_name }}
+          resource-group: rg-hussain-enterprise
           package: api
