@@ -90,7 +90,7 @@ jobs:
           echo "API App Service: $API_APP_NAME"
 
   build-ui:
-    name: 'Build UI'
+    name: 'Prepare UI Artifact'
     needs: [detect, infrastructure]
     if: needs.detect.outputs.ui_changed == 'true' || needs.detect.outputs.infra_changed == 'true'
     runs-on: ubuntu-latest
@@ -98,22 +98,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js UI
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Dependencies & Build
-        working-directory: ui
-        run: |
-          npm install
-          npm run build
-
       - name: Upload UI Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ui-build
-          path: ui/dist
+          path: ui
           retention-days: 1
 
   build-api:
