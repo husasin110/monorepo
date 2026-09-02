@@ -104,7 +104,7 @@ jobs:
       - name: Install Dependencies & Build
         working-directory: ui
         run: |
-          npm ci
+          npm install
           npm run build
 
       - name: Upload UI Artifact
@@ -131,7 +131,7 @@ jobs:
       - name: Install Dependencies & Test
         working-directory: api
         run: |
-          npm ci || true
+          npm install || true
           npm test || echo "No tests configured"
 
       - name: Upload API Artifact
